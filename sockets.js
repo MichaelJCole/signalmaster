@@ -1,6 +1,5 @@
-var socketIO = require('socket.io'),
-    uuid = require('node-uuid'),
-    crypto = require('crypto');
+var socketIO = require('socket.io');
+var uuid = require('node-uuid');
 
 module.exports = function (server, config) {
     var io = socketIO.listen(server);
@@ -11,6 +10,7 @@ module.exports = function (server, config) {
     }
 
     io.sockets.on('connection', function (client) {
+        // Default resources
         client.resources = {
             screen: false,
             video: true,
@@ -37,8 +37,6 @@ module.exports = function (server, config) {
             removeFeed('screen');
         });
 
-        client.on('join', join);
-
         function removeFeed(type) {
             if (client.room) {
                 io.sockets.in(client.room).emit('remove', {
@@ -51,6 +49,8 @@ module.exports = function (server, config) {
                 }
             }
         }
+
+        client.on('join', join);
 
         function join(name, cb) {
             // sanity check
@@ -102,30 +102,6 @@ module.exports = function (server, config) {
             [data.type, data.session, data.prefix, data.peer, data.time, data.value]
             ));
         });
-
-
-        // tell client about stun and turn servers and generate nonces
-        client.emit('stunservers', config.stunservers || []);
-
-        // create shared secret nonces for TURN authentication
-        // the process is described in draft-uberti-behave-turn-rest
-        var credentials = [];
-        // allow selectively vending turn credentials based on origin.
-        var origin = client.handshake.headers.origin;
-        if (!config.turnorigins || config.turnorigins.indexOf(origin) !== -1) {
-            config.turnservers.forEach(function (server) {
-                var hmac = crypto.createHmac('sha1', server.secret);
-                // default to 86400 seconds timeout unless specified
-                var username = Math.floor(new Date().getTime() / 1000) + (server.expiry || 86400) + "";
-                hmac.update(username);
-                credentials.push({
-                    username: username,
-                    credential: hmac.digest('base64'),
-                    urls: server.urls || server.url
-                });
-            });
-        }
-        client.emit('turnservers', credentials);
     });
 
 
